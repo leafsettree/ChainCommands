@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Zenject;
 
 namespace Jw
@@ -85,7 +85,7 @@ public class ChainCommandsService
 		}
 	}
 
-	public async Task Run<T>(T signal) where T : class, IChainSignal
+	public async UniTask Run<T>(T signal) where T : class, IChainSignal
 	{
 		var tData = typeof(T);
 		if (!_signalToCommandChain.TryGetValue(tData, out var commandTypes))
