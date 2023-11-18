@@ -21,27 +21,27 @@ public class ChainCommandsService
 
 	public T GetSignal<T>() where T : class, IChainSignal, new()
 	{
-		var t = typeof(T);
-		if (_signalPools.TryGetValue(t, out var stack) && stack.Count > 0)
+		Type t = typeof(T);
+		if (_signalPools.TryGetValue(t, out Stack<IChainSignal> stack) && stack.Count > 0)
 		{
-			var signal = (T)stack.Pop();
+			T signal = (T)stack.Pop();
 			_di.Inject(signal);
 			return signal;
 		}
-		var sig = Activator.CreateInstance(t);
+		object sig = Activator.CreateInstance(t);
 		_di.Inject(sig);
 		return (T)sig;
 	}
 
 	private IChainCommand GetOrCreateCommand(Type t)
 	{
-		if (_commandPools.TryGetValue(t, out var stack) && stack.Count > 0)
+		if (_commandPools.TryGetValue(t, out Stack<IChainCommand> stack) && stack.Count > 0)
 		{
-			var command = stack.Pop();
+			IChainCommand command = stack.Pop();
 			_di.Inject(command);
 			return command;
 		}
-		var cmd = Activator.CreateInstance(t);
+		object cmd = Activator.CreateInstance(t);
 		_di.Inject(cmd);
 		return (IChainCommand)cmd;
 	}
@@ -59,7 +59,7 @@ public class ChainCommandsService
 
 	private void PoolSignal<T>(T signal) where T : class, IChainSignal
 	{
-		var t = typeof(T);
+		Type t = typeof(T);
 		Stack<IChainSignal> stack;
 		if (!_signalPools.TryGetValue(t, out stack!))
 		{
@@ -71,9 +71,9 @@ public class ChainCommandsService
 
 	public void Register<T>(List<Type> commandTypes) where T : class, IChainSignal
 	{
-		var tData = typeof(T);
+		Type tData = typeof(T);
 
-		var nonCommandsCount = commandTypes.RemoveAll(t=>!typeof(IChainCommand).IsAssignableFrom(t));
+		int nonCommandsCount = commandTypes.RemoveAll(t=>!typeof(IChainCommand).IsAssignableFrom(t));
 		if (nonCommandsCount > 0)
 		{
 			_logger.LogError($"{tData.FullName} has {nonCommandsCount} non IChainCommand.");
@@ -87,16 +87,16 @@ public class ChainCommandsService
 
 	public async UniTask Run<T>(T signal) where T : class, IChainSignal
 	{
-		var tData = typeof(T);
-		if (!_signalToCommandChain.TryGetValue(tData, out var commandTypes))
+		Type tData = typeof(T);
+		if (!_signalToCommandChain.TryGetValue(tData, out List<Type> commandTypes))
 		{
 			return;
 		}
 
-		for (var i = 0; i < commandTypes.Count; i++)
+		for (int i = 0; i < commandTypes.Count; i++)
 		{
-			var t = commandTypes[i];
-			var instance = GetOrCreateCommand(t);
+			Type t = commandTypes[i];
+			IChainCommand instance = GetOrCreateCommand(t);
 			instance.SignalObj = signal;
 			try
 			{
