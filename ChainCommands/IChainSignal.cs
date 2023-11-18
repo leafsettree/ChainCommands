@@ -1,7 +1,8 @@
 using System;
 
-namespace Jw;
-
+namespace Jw
+{
 public interface IChainSignal : IDisposable
 {
+}
 }

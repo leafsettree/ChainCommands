@@ -1,20 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Unity;
+using Zenject;
 
-namespace Jw;
-
+namespace Jw
+{
 public class ChainCommandsService
 {
-	public ChainCommandsService (IUnityContainer di, ILogService logger)
+	public ChainCommandsService (DiContainer di, ILogService logger)
 	{
 		_di = di;
 		_logger = logger;
 	}
 
 	private Dictionary<Type, List<Type>> _signalToCommandChain = new();
-	private IUnityContainer _di;
+	private DiContainer _di;
 	private Dictionary<Type,Stack<IChainSignal>> _signalPools = new();
 	private Dictionary<Type,Stack<IChainCommand>> _commandPools = new();
 	private readonly ILogService _logger;
@@ -25,10 +25,12 @@ public class ChainCommandsService
 		if (_signalPools.TryGetValue(t, out var stack) && stack.Count > 0)
 		{
 			var signal = (T)stack.Pop();
-			_di.BuildUp(signal);
+			_di.Inject(signal);
 			return signal;
 		}
-		return (T)_di.Resolve(t);
+		var sig = Activator.CreateInstance(t);
+		_di.Inject(sig);
+		return (T)sig;
 	}
 
 	private IChainCommand GetOrCreateCommand(Type t)
@@ -36,10 +38,12 @@ public class ChainCommandsService
 		if (_commandPools.TryGetValue(t, out var stack) && stack.Count > 0)
 		{
 			var command = stack.Pop();
-			_di.BuildUp(t, command);
+			_di.Inject(command);
 			return command;
 		}
-		return (IChainCommand)_di.Resolve(t);
+		var cmd = Activator.CreateInstance(t);
+		_di.Inject(cmd);
+		return (IChainCommand)cmd;
 	}
 
 	private void PoolCommand<T>(T command, Type commandT) where T : class, IChainCommand
@@ -77,11 +81,11 @@ public class ChainCommandsService
 
 		if (!_signalToCommandChain.TryAdd(tData, commandTypes))
 		{
-			Console.WriteLine($"Already registered: {tData.FullName}");
+			_logger.Log($"Already registered: {tData.FullName}");
 		}
 	}
 
-	public async Task Run<T>(T? signal) where T : class, IChainSignal
+	public async Task Run<T>(T signal) where T : class, IChainSignal
 	{
 		var tData = typeof(T);
 		if (!_signalToCommandChain.TryGetValue(tData, out var commandTypes))
@@ -109,4 +113,5 @@ public class ChainCommandsService
 		signal.Dispose();
 		PoolSignal(signal);
 	}
+}
 }
